@@ -1,0 +1,24 @@
+# .gitpod.yml
+# Konfigurácia pre automatickú inštaláciu a spustenie
+
+# Definovanie úloh (tasks) pri štarte pracovného priestoru
+tasks:
+  - name: Setup and Run Patent Analysis
+    # 'init' sa spustí raz pri vytvorení workspace (cachuje sa)
+    init: pip install -r requirements.txt --break-system-packages
+    # 'command' sa spúšťa pri každom otvorení workspace
+    command: |
+      echo "✅ Environment je pripravený!"
+      echo "Môžeš spustiť: python main.py --dev --trends"
+      echo "Alebo: python trend_analyzer.py"
+    
+# Rozšírenia VS Code
+vscode:
+  extensions:
+    - ms-python.python
+    - formulahendry.code-runner
+    
+# Porty
+ports:
+  - port: 8888
+    onOpen: ignore

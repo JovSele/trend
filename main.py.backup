@@ -1,0 +1,175 @@
+"""
+Unlocked Patents - Hlavný Orchestrátor (S Google Trends)
+=========================================================
+
+Verzia 2.0 - Pridaná Google Trends analýza
+"""
+
+from config import Config, ConfigDevelopment
+from modules import DataLoader, PatentFilters, CommercialScoring, DataExporter
+
+# Google Trends je voliteľný
+try:
+    from modules.google_trends import GoogleTrendsAnalyzer
+    TRENDS_AVAILABLE = True
+except ImportError:
+    TRENDS_AVAILABLE = False
+    print("⚠️  Google Trends modul nie je dostupný.")
+    print("   Spustite: pip install pytrends")
+
+
+def main(use_dev_config=False, enable_google_trends=False):
+    """
+    Hlavná funkcia
+    
+    Args:
+        use_dev_config: Použiť dev config (10 patentov)
+        enable_google_trends: Spustiť Google Trends analýzu
+    """
+    
+    print("=" * 70)
+    print("🔓 UNLOCKED PATENTS - Automated Patent Curation Pipeline v2.0")
+    if enable_google_trends and TRENDS_AVAILABLE:
+        print("   📈 Google Trends: ENABLED")
+    print("=" * 70)
+    
+    # Konfigurácia
+    config = ConfigDevelopment() if use_dev_config else Config()
+    
+    try:
+        # === FÁZA 1: Základné Spracovanie ===
+        print("\n📊 FÁZA 1: Základné Spracovanie")
+        print("-" * 70)
+        
+        # 1. Načítanie
+        loader = DataLoader(config)
+        df = loader.load_csv()
+        
+        # 2. Filtrovanie
+        filters = PatentFilters(config)
+        df_filtered = filters.apply_all_filters(df)
+        
+        # 3. Scoring
+        scoring = CommercialScoring(config)
+        df_scored = scoring.calculate_scores(df_filtered)
+        
+        # === FÁZA 2: Google Trends (Voliteľné) ===
+        if enable_google_trends and TRENDS_AVAILABLE:
+            print("\n📈 FÁZA 2: Google Trends Enrichment")
+            print("-" * 70)
+            
+            # Analyzujeme len TOP N patentov (nie všetky)
+            top_for_trends = df_scored.head(config.TOP_N_PATENTS).copy()
+            
+            analyzer = GoogleTrendsAnalyzer()
+            top_enriched = analyzer.batch_analyze(
+                top_for_trends,
+                title_col=config.COLUMNS['title'],
+                batch_size=10,
+                delay_between_batches=60
+            )
+            
+            # Aktualizujeme skóre s Google Trends
+            if config.WEIGHTS.get('google_trends', 0) > 0:
+                print("\n   Prepočítavam finálne skóre s Google Trends...")
+                top_enriched = _recalculate_with_trends(top_enriched, config)
+            
+            df_scored = top_enriched
+        
+        # === FÁZA 3: Export ===
+        print("\n💾 FÁZA 3: Export")
+        print("-" * 70)
+        
+        exporter = DataExporter(config)
+        output_file = exporter.export_top_n(df_scored)
+        
+        # === ZÁVER ===
+        print("\n" + "=" * 60)
+        print(f"✅ Hromadné spracovanie dokončené!")
+        print(f"TOP {config.TOP_N_PATENTS} patentov uložených v: {output_file}")
+        
+        if enable_google_trends and TRENDS_AVAILABLE:
+            print(f"📈 Google Trends data pridané!")
+            avg_trends = df_scored['Google_Trends_Score'].mean()
+            print(f"   Priemerné Trends Score: {avg_trends:.3f}")
+        else:
+            print(f"💡 TIP: Spustite s --trends pre Google Trends analýzu")
+        
+        print("=" * 60)
+        
+        return df_scored
+        
+    except FileNotFoundError as e:
+        print(f"❌ Chyba: {e}")
+        return None
+        
+    except KeyError as e:
+        print(f"❌ Chyba: Chýba stĺpec {e}")
+        return None
+        
+    except Exception as e:
+        print(f"❌ Neočakávaná chyba: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def _recalculate_with_trends(df, config):
+    """
+    Prepočíta finálne skóre s Google Trends
+    
+    Používa váhy z config.WEIGHTS
+    """
+    import numpy as np
+    
+    # Normalizujeme Google Trends Score (už je 0-1)
+    df['score_google_trends'] = df['Google_Trends_Score'].fillna(0)
+    
+    # Získame váhy
+    w_patent = config.WEIGHTS.get('citations_patent', 0.30)
+    w_npl = config.WEIGHTS.get('citations_npl', 0.30)
+    w_family = config.WEIGHTS.get('family_size', 0.20)
+    w_trends = config.WEIGHTS.get('google_trends', 0.20)
+    
+    # Normalizujeme váhy na súčet 1.0
+    total_weight = w_patent + w_npl + w_family + w_trends
+    w_patent /= total_weight
+    w_npl /= total_weight
+    w_family /= total_weight
+    w_trends /= total_weight
+    
+    # Prepočet
+    col_patent = config.COLUMNS['citations_patent']
+    col_npl = config.COLUMNS['citations_npl']
+    col_family = config.COLUMNS['family_size']
+    
+    df['Final_Score'] = (
+        df[f'score_{col_patent}'] * w_patent +
+        df[f'score_{col_npl}'] * w_npl +
+        df[f'score_{col_family}'] * w_family +
+        df['score_google_trends'] * w_trends
+    )
+    
+    # Zoradenie
+    df = df.sort_values(by='Final_Score', ascending=False)
+    
+    print(f"   ✓ Skóre prepočítané s Google Trends (váha: {w_trends:.2%})")
+    
+    return df
+
+
+if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Unlocked Patents Pipeline')
+    parser.add_argument('--dev', action='store_true', 
+                       help='Použiť dev config (10 patentov)')
+    parser.add_argument('--trends', action='store_true',
+                       help='Povoliť Google Trends analýzu')
+    
+    args = parser.parse_args()
+    
+    main(
+        use_dev_config=args.dev,
+        enable_google_trends=args.trends
+    )

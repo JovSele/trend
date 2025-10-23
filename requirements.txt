@@ -1,0 +1,10 @@
+pandas>=2.0.0           # Pre prácu s dátami (DataFrames)
+numpy>=1.24.0           # Podpora pre numerické výpočty
+scipy>=1.10.0           # Štatistické a vedecké výpočty
+matplotlib>=3.7.0       # Pre vizualizáciu dát a trendov
+seaborn>=0.12.0         # Pre pokročilú vizualizáciu
+openpyxl>=3.1.0         # Pre prácu s Excel súbormi
+scikit-learn>=1.3.0     # Pre machine learning a clustering
+pytrends>=4.9.0         # Pre Google Trends analýzu
+python-dotenv>=1.0.0    # Pre načítanie environment premenných z .env
+anthropic>=0.39.0       # Claude AI API
