@@ -35,12 +35,27 @@ class DataExporter:
             if col in top_df.columns:
                 output_cols.append(col)
         
-        # Google Trends stĺpce (ak existujú)
-        trends_cols = ['Google_Trends_Score', 'Google_Trends_Keyword', 
-                      'Google_Trends_Direction', 'Google_Trends_Avg_Interest']
-        for col in trends_cols:
+        # Google Trends stĺpce - AGREGOVANÉ
+        agg_trends_cols = [
+            'Google_Trends_Average_Score',
+            'Google_Trends_Best_Keyword', 
+            'Google_Trends_Consensus'
+        ]
+        for col in agg_trends_cols:
             if col in top_df.columns:
                 output_cols.append(col)
+        
+        # Google Trends - INDIVIDUÁLNE KEYWORDS (až 3)
+        for i in range(1, 4):
+            individual_cols = [
+                f'Google_Trends_Keyword_{i}',
+                f'Google_Trends_Score_{i}',
+                f'Google_Trends_Direction_{i}',
+                f'Google_Trends_Interest_{i}'
+            ]
+            for col in individual_cols:
+                if col in top_df.columns:
+                    output_cols.append(col)
         
         # Manuálne stĺpce
         top_df['Unlocked_Comment'] = ""

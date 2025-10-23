@@ -133,7 +133,8 @@ def main(use_dev_config=False, enable_ai=True, enable_google_trends=True):
 
 def _trends_with_ai_keywords(df, trends_analyzer, config):
     """
-    Google Trends analýza použije AI-generované keywords
+    Google Trends analýza pre VŠETKY AI keywords (až 3)
+    Vypočíta priemer + identifikuje best keyword
     """
     import pandas as pd
     import time
@@ -141,59 +142,112 @@ def _trends_with_ai_keywords(df, trends_analyzer, config):
     results = []
     total = len(df)
     
-    print(f"\n🔍 GOOGLE TRENDS (s AI keywords):")
+    print(f"\n🔍 GOOGLE TRENDS (Multi-Keyword Analysis):")
     print(f"   Patenty: {total}")
+    print(f"   Analyzujem až 3 keywords na patent\n")
     
     for idx, row in df.iterrows():
-        print(f"   📄 Patent {idx + 1}/{total}...", end='')
+        print(f"   📄 Patent {idx + 1}/{total}:")
         
-        # AI keywords (už sú v DataFrame)
-        keywords = row.get('AI_Keywords_List', [])
+        # AI keywords (až 3)
+        keywords_list = row.get('AI_Keywords_List', [])
         
-        if not keywords:
-            print(" ⚠️  Žiadne keywords")
-            results.append({
-                'index': idx,
-                'Google_Trends_Score': 0.0,
-                'Google_Trends_Keyword': '',
-                'Google_Trends_Direction': 'unknown',
-                'Google_Trends_Avg_Interest': 0.0
-            })
+        if not keywords_list:
+            print("      ⚠️  Žiadne AI keywords")
+            results.append(_empty_trends_result(idx))
             continue
         
-        # Použijeme LEN prvé keyword (nie všetky naraz)
-        keyword = keywords[0] if keywords else ''
+        # Analyzujeme až 3 keywords
+        keyword_results = []
         
-        print(f" [{keyword}]...", end='')  # ← NOVÝ RIADOK - vypíše keyword
+        for i, keyword in enumerate(keywords_list[:3], 1):
+            print(f"      KW{i}: [{keyword}]...", end='', flush=True)
+            
+            # Google Trends analýza
+            result = trends_analyzer.analyze_patent(
+                title=keyword,
+                abstract=None
+            )
+            
+            keyword_results.append({
+                'keyword': keyword,
+                'score': result['final_score'],
+                'direction': result['trend_direction'],
+                'avg_interest': result['avg_interest']
+            })
+            
+            print(f" ✓ (score: {result['final_score']:.3f}, {result['trend_direction']})")
+            
+            # Delay medzi keywords
+            if i < len(keywords_list[:3]):
+                time.sleep(2)
         
-        # Google Trends analýza
-        result = trends_analyzer.analyze_patent(
-            title=keyword,
-            abstract=None
-        )
+        # Výpočet agregovaných metrík
+        avg_score = sum(r['score'] for r in keyword_results) / len(keyword_results)
+        best_keyword = max(keyword_results, key=lambda x: x['score'])
         
-        print(f" ✓ ({result['trend_direction']}, score: {result['final_score']:.3f})")  # ← ROZŠÍRENÝ výpis
+        # Trend consensus
+        directions = [r['direction'] for r in keyword_results]
+        if directions.count('rising') >= 2:
+            consensus = 'Rising'
+        elif directions.count('falling') >= 2:
+            consensus = 'Falling'
+        else:
+            consensus = 'Mixed'
         
-        results.append({
+        print(f"      📊 AVG: {avg_score:.3f} | BEST: {best_keyword['keyword']} | CONSENSUS: {consensus}\n")
+        
+        # Uloženie výsledkov
+        result_data = {
             'index': idx,
-            'Google_Trends_Score': result['final_score'],
-            'Google_Trends_Keyword': keyword,
-            'Google_Trends_Direction': result['trend_direction'],
-            'Google_Trends_Avg_Interest': result['avg_interest']
-        })
+            'Google_Trends_Average_Score': avg_score,
+            'Google_Trends_Best_Keyword': best_keyword['keyword'],
+            'Google_Trends_Consensus': consensus,
+        }
         
-        time.sleep(2)  # Rate limiting
+        # Individuálne keywords (až 3)
+        for i, kr in enumerate(keyword_results, 1):
+            result_data[f'Google_Trends_Keyword_{i}'] = kr['keyword']
+            result_data[f'Google_Trends_Score_{i}'] = kr['score']
+            result_data[f'Google_Trends_Direction_{i}'] = kr['direction']
+            result_data[f'Google_Trends_Interest_{i}'] = kr['avg_interest']
+        
+        results.append(result_data)
+        
+        # Pauza medzi patentmi
+        if idx < df.index[-1]:
+            time.sleep(3)
+    
+    print(f"✓ Multi-Keyword Google Trends analýza dokončená!\n")
     
     # Merge výsledkov
     results_df = pd.DataFrame(results).set_index('index')
     return df.join(results_df)
 
 
+def _empty_trends_result(idx):
+    """Prázdny výsledok pre patent bez keywords"""
+    return {
+        'index': idx,
+        'Google_Trends_Average_Score': 0.0,
+        'Google_Trends_Best_Keyword': '',
+        'Google_Trends_Consensus': 'Unknown',
+        'Google_Trends_Keyword_1': '',
+        'Google_Trends_Score_1': 0.0,
+        'Google_Trends_Direction_1': 'unknown',
+        'Google_Trends_Interest_1': 0.0
+    }
+
+
 def _recalculate_with_trends(df, config):
     """Prepočíta Final_Score s Google Trends"""
     import numpy as np
     
-    df['score_google_trends'] = df['Google_Trends_Score'].fillna(0)
+    # Použijeme AVERAGE score zo všetkých keywords
+    if 'Google_Trends_Average_Score' in df.columns:
+        df['score_google_trends'] = df['Google_Trends_Average_Score'].fillna(0)
+    else:
+        df['score_google_trends'] = 0
     
     w_patent = config.WEIGHTS.get('citations_patent', 0.30)
     w_npl = config.WEIGHTS.get('citations_npl', 0.30)
