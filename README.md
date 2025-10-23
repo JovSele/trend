@@ -29,4 +29,3 @@ WEBSHARE_PROXY_PORT=6641
 
 # API Key Claude
 # Nove API https://console.anthropic.com/dashboard
-ANTHROPIC_API_KEY=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
