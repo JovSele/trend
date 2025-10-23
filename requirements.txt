@@ -8,3 +8,4 @@ scikit-learn>=1.3.0     # Pre machine learning a clustering
 pytrends>=4.9.0         # Pre Google Trends analýzu
 python-dotenv>=1.0.0    # Pre načítanie environment premenných z .env
 anthropic>=0.39.0       # Claude AI API
+requests>=2.31.0        # HTTP requests pre social proof module

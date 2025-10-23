@@ -3,7 +3,8 @@ from .filters import PatentFilters
 from .scoring import CommercialScoring
 from .export import DataExporter
 from .google_trends import GoogleTrendsAnalyzer  
-from .ai_enrichment import AIEnrichment  
+from .ai_enrichment import AIEnrichment
+from .social_proof import SocialProof, SocialProofResult
 
 __all__ = [
     'DataLoader',
@@ -11,5 +12,7 @@ __all__ = [
     'CommercialScoring',
     'DataExporter',
     'GoogleTrendsAnalyzer',
-    'AIEnrichment'
+    'AIEnrichment',
+    'SocialProof',
+    'SocialProofResult'
 ]
