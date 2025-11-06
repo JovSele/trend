@@ -1,1 +1,7 @@
+# .gitignore
+# Všeobecné súbory Pythonu
+__pycache__/
+*.pyc
+
+# Súbory s citlivými údajmi
 .env

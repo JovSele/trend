@@ -1,6 +1,6 @@
 """
 Centralizovaná konfigurácia pre Unlocked Patents
-Verzia 2.0 - S Google Trends podporou
+Verzia 3.0 - S Percentilovým Scoringom
 """
 
 class Config:
@@ -15,6 +15,7 @@ class Config:
         'citations_patent': 'Cited by Patent Count',
         'citations_npl': 'NPL Citation Count',
         'family_size': 'Simple Family Size',
+        'jurisdictions': 'Simple Family Member Jurisdictions',  # NOVÉ!
         'legal_status': 'Legal Status',
         'title': 'Title',
         'abstract': 'Abstract',
@@ -25,71 +26,77 @@ class Config:
     # === FILTER NASTAVENIA ===
     FILTERS = {
         'legal_status': 'EXPIRED',
-        'min_citations_total': 5,
+        'min_citations_total': 0,  # Znížené na 0 (tvrdý filter v scoringu)
     }
     
-    # === SCORING WEIGHTS ===
-    # VARIANT A: Bez Google Trends (pôvodné váhy)
+    # === SCORING WEIGHTS (v2.0) ===
     WEIGHTS = {
-        'citations_patent': 0.40,  # Forward Citations (40%)
-        'citations_npl': 0.35,     # NPL Citations (35%)
-        'family_size': 0.25,       # Family Size (25%)
-        'google_trends': 0.00,     # Google Trends (0% = vypnuté)
+        'citations_patent': 0.50,  # Technický dopad (50%)
+        'family_size': 0.35,       # Komerčný dopad (35%)
+        'jurisdictions': 0.15,     # Pokrytie trhu (15%)
+        'google_trends': 0.00,     # Google Trends (vypnuté)
     }
     
-    # VARIANT B: S Google Trends (odkomentujte ak chcete)
-    # WEIGHTS = {
-    #     'citations_patent': 0.30,  # Forward Citations (30%)
-    #     'citations_npl': 0.25,     # NPL Citations (25%)
-    #     'family_size': 0.20,       # Family Size (20%)
-    #     'google_trends': 0.25,     # Google Trends (25%)
-    # }
+    # === SCORING NASTAVENIA (v2.0) ===
+    SCORING = {
+        'min_score_percentile': 0.99,  # TOP 1% patentov
+    }
     
     # === EXPORT NASTAVENIA ===
-    TOP_N_PATENTS = 5
+    TOP_N_PATENTS = 5  # Po scoringu a AI enrichmente
     
     # === GOOGLE TRENDS NASTAVENIA ===
     GOOGLE_TRENDS = {
-        'timeframe': 'today 12-m',      # Posledných 5 rokov
-        'batch_size': 5,               # Patentov na batch
-        'delay_between_batches': 30,    # Sekúnd medzi batchmi (rate limiting)
+        'timeframe': 'today 12-m',
+        'batch_size': 5,
+        'delay_between_batches': 30,
     }
     
-    # === API KEYS (Pre budúce moduly) ===
-    GOOGLE_TRENDS_API_KEY = None  # pytrends nepotrebuje API key
-    CLAUDE_API_KEY = None          # Pre AI enrichment
+    # === API KEYS ===
+    GOOGLE_TRENDS_API_KEY = None
+    CLAUDE_API_KEY = None
 
 
 class ConfigDevelopment(Config):
     """Konfigurácia pre rýchle testovanie"""
     TOP_N_PATENTS = 5
     
-    # Pre testovanie - kratšie časy
+    SCORING = {
+        'min_score_percentile': 0.95,  # TOP 5% pre dev
+    }
+    
     GOOGLE_TRENDS = {
-        'timeframe': 'today 12-m',      # Len posledný rok
-        'batch_size': 5,                # Menšie batche
-        'delay_between_batches': 60,    # Kratšia pauza
+        'timeframe': 'today 12-m',
+        'batch_size': 3,
+        'delay_between_batches': 10,
     }
 
 
 class ConfigWithTrends(Config):
     """Konfigurácia s povoleným Google Trends"""
     
-    # Prerozdelenie váh s Google Trends
     WEIGHTS = {
-        'citations_patent': 0.30,  # 30%
-        'citations_npl': 0.25,     # 25%
-        'family_size': 0.20,       # 20%
-        'google_trends': 0.25,     # 25%
+        'citations_patent': 0.40,  # 40%
+        'family_size': 0.25,       # 25%
+        'jurisdictions': 0.15,     # 15%
+        'google_trends': 0.20,     # 20%
+    }
+    
+    SCORING = {
+        'min_score_percentile': 0.90,  # TOP 10% s Trends
     }
 
 
 class ConfigProduction(ConfigWithTrends):
     """Produkčná konfigurácia"""
-    TOP_N_PATENTS = 5
+    TOP_N_PATENTS = 10
+    
+    SCORING = {
+        'min_score_percentile': 0.95,  # TOP 5%
+    }
     
     GOOGLE_TRENDS = {
         'timeframe': 'today 12-m',
-        'batch_size': 1,               # Väčšie batche
-        'delay_between_batches': 90,   # Dlhšia pauza (bezpečnejšie)
+        'batch_size': 1,
+        'delay_between_batches': 90,
     }

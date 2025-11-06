@@ -1,10 +1,10 @@
 """
-AI Enrichment Module - Claude API Integration
-==============================================
+AI Enrichment Module - Claude API Integration (English Output)
+===============================================================
 
-Používa Claude na:
-1. Prepis abstraktu do ľudskej reči
-2. Extrakcia lepších kľúčových slov pre Google Trends
+Uses Claude to:
+1. Rewrite abstract in human-readable English
+2. Extract better keywords for Google Trends in English
 """
 
 import anthropic
@@ -19,12 +19,12 @@ load_dotenv()
 
 
 class AIEnrichment:
-    """Claude AI enrichment pre patenty"""
+    """Claude AI enrichment for patents - English output"""
     
     def __init__(self, model="claude-sonnet-4-20250514"):
         """
         Args:
-            model: Claude model (claude-sonnet-4-20250514 odporúčaný)
+            model: Claude model (claude-sonnet-4-20250514 recommended)
         """
         api_key = os.getenv('ANTHROPIC_API_KEY')
         
@@ -37,22 +37,22 @@ class AIEnrichment:
     
     def enrich_patent(self, title: str, abstract: str) -> Dict:
         """
-        Analyzuje patent pomocou Claude AI
+        Analyzes patent using Claude AI (English output)
         
         Args:
-            title: Názov patentu
-            abstract: Abstrakt patentu
+            title: Patent title
+            abstract: Patent abstract
             
         Returns:
             {
-                'human_abstract': str,  # Zrozumiteľný opis
-                'keywords': list,       # Kľúčové slová pre Google Trends
-                'use_cases': list,      # Praktické použitia
-                'market_potential': str # Komerčný potenciál
+                'human_abstract': str,  # English readable description
+                'keywords': list,       # English keywords for Google Trends
+                'use_cases': list,      # Practical applications in English
+                'market_potential': str # Commercial potential in English
             }
         """
         
-        # Príprava promptu
+        # Prepare prompt (in English)
         prompt = self._create_prompt(title, abstract)
         
         try:
@@ -60,13 +60,13 @@ class AIEnrichment:
             message = self.client.messages.create(
                 model=self.model,
                 max_tokens=1000,
-                temperature=0.3,  # Nižšia = konzistentnejšie výsledky
+                temperature=0.3,  # Lower = more consistent results
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
             )
             
-            # Parsovanie odpovede
+            # Parse response
             response_text = message.content[0].text
             result = self._parse_response(response_text)
             
@@ -77,31 +77,35 @@ class AIEnrichment:
             return self._empty_result()
     
     def _create_prompt(self, title: str, abstract: str) -> str:
-        """Vytvorí prompt pre Claude"""
+        """Creates prompt for Claude - ENGLISH OUTPUT ONLY"""
         
-        prompt = f"""Analyzuj tento expirovaný patent a pomôž mi posúdiť jeho komerčný potenciál.
+        prompt = f"""Analyze this expired patent and help me assess its commercial potential.
 
 PATENT TITLE: {title}
 
 PATENT ABSTRACT: {abstract}
 
-Potrebujem od teba:
+I need from you:
 
-1. HUMAN ABSTRACT (2-3 vety):
-   Prepíš technický abstrakt do jednoduchej, zrozumiteľnej reči. Vysvetli ČO táto technológia robí a PREČO by mohla byť užitočná.
+1. HUMAN ABSTRACT (2-3 sentences in ENGLISH):
+   Rewrite the technical abstract into simple, understandable language. Explain WHAT this technology does and WHY it could be useful.
+   IMPORTANT: Write in English only.
 
-2. GOOGLE TRENDS KEYWORDS (3-5 slov):
-   Navrhni kľúčové slová, ktoré by ľudia hľadali na Google, ak by túto technológiu potrebovali. 
-   Používaj bežné, populárne termíny, NIE technický žargón.
-   Príklad: namiesto "thermal cycler" použi "PCR machine" alebo "DNA testing equipment"
+2. GOOGLE TRENDS KEYWORDS (3-5 keywords in ENGLISH):
+   Suggest keywords that people would search on Google if they needed this technology.
+   Use common, popular terms, NOT technical jargon.
+   Example: instead of "thermal cycler" use "PCR machine" or "DNA testing equipment"
+   IMPORTANT: All keywords must be in English.
 
-3. USE CASES (3 konkrétne príklady):
-   Kde by sa toto dalo prakticky použiť? Reálne aplikácie v konkrétnych odvetviach.
+3. USE CASES (3 specific examples in ENGLISH):
+   Where could this be practically used? Real applications in specific industries.
+   IMPORTANT: Write in English only.
 
-4. MARKET POTENTIAL (1-2 vety):
-   Krátke zhodnotenie: Je to stále relevantné? Rastúci alebo klesajúci trh? Veľký alebo niche?
+4. MARKET POTENTIAL (1-2 sentences in ENGLISH):
+   Brief assessment: Is this still relevant? Growing or declining market? Large or niche?
+   IMPORTANT: Write in English only.
 
-FORMÁT ODPOVEDE (presne takto):
+OUTPUT FORMAT (exactly like this):
 ```json
 {{
   "human_abstract": "...",
@@ -111,15 +115,16 @@ FORMÁT ODPOVEDE (presne takto):
 }}
 ```
 
-Odpovedaj VÝHRADNE JSON, nič pred ani za ním."""
+CRITICAL: All text in the JSON must be in ENGLISH. Do not use any other language.
+Respond ONLY with JSON, nothing before or after it."""
         
         return prompt
     
     def _parse_response(self, response_text: str) -> Dict:
-        """Parsuje Claude odpoveď"""
+        """Parses Claude response"""
         
         try:
-            # Odstránenie markdown ```json blokov ak existujú
+            # Remove markdown ```json blocks if exist
             text = response_text.strip()
             if text.startswith('```json'):
                 text = text[7:]
@@ -131,7 +136,7 @@ Odpovedaj VÝHRADNE JSON, nič pred ani za ním."""
             # Parse JSON
             data = json.loads(text.strip())
             
-            # Validácia
+            # Validation
             return {
                 'human_abstract': data.get('human_abstract', ''),
                 'keywords': data.get('keywords', [])[:5],  # Max 5
@@ -144,7 +149,7 @@ Odpovedaj VÝHRADNE JSON, nič pred ani za ním."""
             return self._empty_result()
     
     def _empty_result(self) -> Dict:
-        """Prázdny výsledok pri chybe"""
+        """Empty result on error"""
         return {
             'human_abstract': '',
             'keywords': [],
@@ -156,21 +161,21 @@ Odpovedaj VÝHRADNE JSON, nič pred ani za ním."""
                     title_col: str, abstract_col: str,
                     delay: float = 1.0) -> pd.DataFrame:
         """
-        Analyzuje viacero patentov v dávke
+        Analyzes multiple patents in batch
         
         Args:
-            patents_df: DataFrame s patentmi
-            title_col: Názov stĺpca s titulkom
-            abstract_col: Názov stĺpca s abstraktom
-            delay: Pauza medzi requestmi (sekundy)
+            patents_df: DataFrame with patents
+            title_col: Column name with title
+            abstract_col: Column name with abstract
+            delay: Pause between requests (seconds)
             
         Returns:
-            DataFrame s pridanými AI stĺpcami
+            DataFrame with added AI columns (in English)
         """
         
         total = len(patents_df)
         
-        print(f"\n🤖 AI ENRICHMENT (Claude):")
+        print(f"\n🤖 AI ENRICHMENT (Claude - English output):")
         print(f"   Patenty na spracovanie: {total}")
         print(f"   Delay medzi requestmi: {delay}s")
         print(f"   Odhadovaný čas: {(total * delay) / 60:.1f} min")
@@ -181,7 +186,7 @@ Odpovedaj VÝHRADNE JSON, nič pred ani za ním."""
         for idx, row in patents_df.iterrows():
             print(f"   📄 Patent {idx + 1}/{total}...", end='')
             
-            # AI analýza
+            # AI analysis
             result = self.enrich_patent(
                 row[title_col],
                 row[abstract_col]
@@ -189,14 +194,14 @@ Odpovedaj VÝHRADNE JSON, nič pred ani za ním."""
             
             print(f" ✓")
             
-            # Uloženie výsledkov
+            # Save results
             results.append({
                 'index': idx,
                 'AI_Human_Abstract': result['human_abstract'],
                 'AI_Keywords': ', '.join(result['keywords']),
                 'AI_Use_Cases': ' | '.join(result['use_cases']),
                 'AI_Market_Potential': result['market_potential'],
-                'AI_Keywords_List': result['keywords']  # Pre Google Trends
+                'AI_Keywords_List': result['keywords']  # For Google Trends
             })
             
             # Delay
@@ -205,23 +210,23 @@ Odpovedaj VÝHRADNE JSON, nič pred ani za ním."""
         
         print(f"\n✓ AI analýza dokončená!")
         
-        # Merge výsledkov
+        # Merge results
         results_df = pd.DataFrame(results).set_index('index')
         return patents_df.join(results_df)
 
 
 # =============================================================================
-# TESTOVANIE
+# TESTING
 # =============================================================================
 
 if __name__ == "__main__":
-    """Test na jednom patente"""
+    """Test on one patent"""
     
     print("=" * 70)
-    print("TEST: AI Enrichment Module")
+    print("TEST: AI Enrichment Module (English output)")
     print("=" * 70)
     
-    # Inicializácia
+    # Initialize
     try:
         enricher = AIEnrichment()
     except ValueError as e:
@@ -243,19 +248,19 @@ if __name__ == "__main__":
     print(f"Title: {test_title}")
     print(f"Abstract: {test_abstract[:100]}...")
     
-    # AI analýza
-    print("\n🤖 Spúšťam Claude AI analýzu...\n")
+    # AI analysis
+    print("\n🤖 Spúšťam Claude AI analýzu (English output)...\n")
     result = enricher.enrich_patent(test_title, test_abstract)
     
-    # Výsledky
+    # Results
     print("\n" + "=" * 70)
-    print("VÝSLEDKY:")
+    print("RESULTS (in English):")
     print("=" * 70)
     
     print(f"\n📝 HUMAN ABSTRACT:")
     print(f"   {result['human_abstract']}")
     
-    print(f"\n🔑 KEYWORDS (pre Google Trends):")
+    print(f"\n🔑 KEYWORDS (for Google Trends):")
     for kw in result['keywords']:
         print(f"   • {kw}")
     

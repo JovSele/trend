@@ -1,14 +1,15 @@
 """
-Unlocked Patents - Hlavný Orchestrátor v3.0
+Unlocked Patents - Hlavný Orchestrátor v3.1
 ============================================
 
 Pipeline:
-1. Načítanie a filtrovanie
-2. Base scoring
-3. AI Enrichment (Human Abstract + Keywords)
-4. Google Trends (použije AI keywords)
-5. Final scoring
-6. Export
+1. Načítanie dát z Lens.org
+2. Filter na EXPIRED patenty
+3. NOVÝ: Percentilový scoring (TOP 1-5%)
+4. AI Enrichment (Human Abstract + Keywords)
+5. Google Trends (použije AI keywords)
+6. Final scoring
+7. Export
 """
 
 from config import Config, ConfigDevelopment
@@ -21,13 +22,14 @@ def main(use_dev_config=False, enable_ai=True, enable_google_trends=True):
     Hlavná funkcia s AI a Google Trends
     
     Args:
-        use_dev_config: Dev config (5 patentov)
+        use_dev_config: Dev config (rýchlejšie testovanie)
         enable_ai: Claude AI enrichment
         enable_google_trends: Google Trends analýza
     """
     
     print("=" * 70)
-    print("🔓 UNLOCKED PATENTS - Automated Patent Curation Pipeline v3.0")
+    print("🔓 UNLOCKED PATENTS - Automated Patent Curation Pipeline v3.1")
+    print("   📊 Percentile-Based Scoring: ENABLED")
     if enable_ai:
         print("   🤖 AI Enrichment: ENABLED")
     if enable_google_trends:
@@ -37,8 +39,8 @@ def main(use_dev_config=False, enable_ai=True, enable_google_trends=True):
     config = ConfigDevelopment() if use_dev_config else Config()
     
     try:
-        # === FÁZA 1: Základné Spracovanie ===
-        print("\n📊 FÁZA 1: Základné Spracovanie")
+        # === FÁZA 1: Načítanie & Základné Filtrovanie ===
+        print("\n📂 FÁZA 1: Načítanie a Základné Filtrovanie")
         print("-" * 70)
         
         loader = DataLoader(config)
@@ -47,15 +49,29 @@ def main(use_dev_config=False, enable_ai=True, enable_google_trends=True):
         filters = PatentFilters(config)
         df_filtered = filters.apply_all_filters(df)
         
+        print(f"\n✓ Po základných filtroch: {len(df_filtered)} patentov")
+        
+        # === FÁZA 2: Percentilový Scoring (NOVÝ!) ===
+        print("\n📊 FÁZA 2: Kvantitatívny Scoring & Percentilové Filtrovanie")
+        print("-" * 70)
+        
         scoring = CommercialScoring(config)
         df_scored = scoring.calculate_scores(df_filtered)
         
-        # TOP N patentov
+        if len(df_scored) == 0:
+            print("❌ Po scoringu nezostali žiadne patenty. Ukončujem.")
+            return None
+        
+        print(f"\n✓ Po percentile filtri: {len(df_scored)} patentov (TOP {int(config.SCORING['min_score_percentile']*100)}%)")
+        
+        # TOP N patentov na AI enrichment
         top_patents = df_scored.head(config.TOP_N_PATENTS).copy()
         
-        # === FÁZA 2: AI Enrichment ===
+        print(f"✓ Vybraných TOP {len(top_patents)} patentov na AI enrichment")
+        
+        # === FÁZA 3: AI Enrichment ===
         if enable_ai:
-            print("\n🤖 FÁZA 2: AI Enrichment (Claude)")
+            print("\n🤖 FÁZA 3: AI Enrichment (Claude)")
             print("-" * 70)
             
             try:
@@ -73,9 +89,9 @@ def main(use_dev_config=False, enable_ai=True, enable_google_trends=True):
                 print(f"\n⚠️  AI enrichment preskočený: {e}")
                 enable_ai = False
         
-        # === FÁZA 3: Google Trends (s AI keywords) ===
+        # === FÁZA 4: Google Trends (s AI keywords) ===
         if enable_google_trends:
-            print("\n📈 FÁZA 3: Google Trends Analysis")
+            print("\n📈 FÁZA 4: Google Trends Analysis")
             print("-" * 70)
             
             trends = GoogleTrendsAnalyzer()
@@ -100,27 +116,28 @@ def main(use_dev_config=False, enable_ai=True, enable_google_trends=True):
                 print("\n   Prepočítavam Final_Score s Google Trends...")
                 top_patents = _recalculate_with_trends(top_patents, config)
         
-        # === FÁZA 4: Export ===
-        print("\n💾 FÁZA 4: Export")
+        # === FÁZA 5: Export ===
+        print("\n💾 FÁZA 5: Export")
         print("-" * 70)
         
         exporter = DataExporter(config)
         output_file = exporter.export_top_n(top_patents)
         
         # === ZÁVER ===
-        print("\n" + "=" * 60)
+        print("\n" + "=" * 70)
         print(f"✅ Pipeline dokončený!")
         print(f"📄 Výstup: {output_file}")
+        print(f"📊 Percentile threshold: {config.SCORING['min_score_percentile']*100:.0f}%")
         
         if enable_ai:
             print(f"🤖 AI Human Abstracts: ÁNO")
             print(f"🔑 AI Keywords: ÁNO")
         
         if enable_google_trends:
-            avg_trends = top_patents['Google_Trends_Score'].mean()
+            avg_trends = top_patents.get('Google_Trends_Average_Score', pd.Series([0])).mean()
             print(f"📈 Priemerné Trends Score: {avg_trends:.3f}")
         
-        print("=" * 60)
+        print("=" * 70)
         
         return top_patents
         
@@ -250,24 +267,21 @@ def _recalculate_with_trends(df, config):
         df['score_google_trends'] = 0
     
     w_patent = config.WEIGHTS.get('citations_patent', 0.30)
-    w_npl = config.WEIGHTS.get('citations_npl', 0.30)
-    w_family = config.WEIGHTS.get('family_size', 0.20)
+    w_family = config.WEIGHTS.get('family_size', 0.30)
+    w_juris = config.WEIGHTS.get('jurisdictions', 0.20)
     w_trends = config.WEIGHTS.get('google_trends', 0.20)
     
-    total_weight = w_patent + w_npl + w_family + w_trends
+    total_weight = w_patent + w_family + w_juris + w_trends
     w_patent /= total_weight
-    w_npl /= total_weight
     w_family /= total_weight
+    w_juris /= total_weight
     w_trends /= total_weight
     
-    col_patent = config.COLUMNS['citations_patent']
-    col_npl = config.COLUMNS['citations_npl']
-    col_family = config.COLUMNS['family_size']
-    
+    # Pre Quantitative_Score už máme normalizované hodnoty
     df['Final_Score'] = (
-        df[f'score_{col_patent}'] * w_patent +
-        df[f'score_{col_npl}'] * w_npl +
-        df[f'score_{col_family}'] * w_family +
+        df['Norm_Citations'] * w_patent +
+        df['Norm_Family'] * w_family +
+        df['Norm_Juris'] * w_juris +
         df['score_google_trends'] * w_trends
     )
     
@@ -280,10 +294,11 @@ def _recalculate_with_trends(df, config):
 
 if __name__ == "__main__":
     import argparse
+    import pandas as pd
     
-    parser = argparse.ArgumentParser(description='Unlocked Patents Pipeline v3.0')
+    parser = argparse.ArgumentParser(description='Unlocked Patents Pipeline v3.1')
     parser.add_argument('--dev', action='store_true',
-                       help='Dev config (5 patentov)')
+                       help='Dev config (rýchlejšie testovanie)')
     parser.add_argument('--no-ai', action='store_true',
                        help='Vypnúť AI enrichment')
     parser.add_argument('--no-trends', action='store_true',

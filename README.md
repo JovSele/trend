@@ -29,7 +29,13 @@ WEBSHARE_PROXY_PORT=6641
 
 # API Key Claude
 # Nove API https://console.anthropic.com/dashboard
-
+ANTHROPIC_API_KEY=
+iny kod 
+# sk
+# -ant-
+# api03 
+# -bkH59y3BAZEIbE9l8cbPt7olwvI0vSQZIrsEWgdzFu3MeWQbKvDPgUUj66Ca9G0aTJooQ5dz41inFIiFTxTr6w
+# -xR2TLQAA
 
 popis:
 Programovací tip (Analýza pre databázu):
